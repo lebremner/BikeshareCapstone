@@ -1,0 +1,189 @@
+---
+title: "Comparison of Members and Casual Riders: January -December 2021"
+author: "Lauren Bremner"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Summary
+
+Cyclistic is a growing bike share company with a focus on offering cycling options for all kinds of users, including those who cannot use a traditional bicycle. There are two main types of users: members, who pay a yearly fee for unlimited rides, and casual riders, who purchase single-use or full day passes. A recent analysis by the financial team has determined that annual memberships are more profitable than single rides or day passes. As a result, Cyclistc would like to expand the number of annual membership it sells. 
+
+**Buisness Objective: To compare the riding habits of members and casual users in order to inform marketing strategy geared toward increasing annual memberships.** 
+
+### Data and licenscing 
+
+Data was obtained from the Divvy Bike Share program in conjunction with the City of Chicago. This is a public data set with ride share information dating back to 2013. In accordance with the licensing agreement and data security best practices, no personal or identifying information is shared. This includes things like a single user making multiple trips, past purchasing history, and home address. Because of this the analysis is limited to number of rides taken by user type, average trip duration, seasonality, most popular day of the week to ride, and most popular station. 
+
+Challenges with the data include a large number NA and blank values for the start station name, end station name, and corresponding station ID's. Even though there is latitude and longitude data, each value is slightly different for each ride, making it difficult to accurately match that data with the start station. In addition to this, it seems  Cyclistic (Divvy) may have changed bike share models or the way they in which they label the data between the years of 2020 and 2021. As a result there are fewer docked bikes and and increase in other types of bikes, resulting in only one docked bike ride by an annual member. This seems inaccurate, a real company probably has the information to fill in the gaps, but because of the nature of the data set, the information has not been made available for this analysis. Lastly, in some cases riders fail to return the bike, resulting in an extended trip duration. This represents less than 1% of all riders, and for that reason those rides have been excluded from the analysis.  In addition to the Divvy trip data, I was also able to obtain outdoor "Real Feel" data from Iowa State University, which is publicly available. 
+
+**Data:** https://divvy-tripdata.s3.amazonaws.com/index.html
+**Data:** https://mesonet.agron.iastate.edu/sites/hist.phtml?station=MDW&network=IL_ASOS&year=2021&month=3
+**License:** https://ride.divvybikes.com/data-license-agreement
+
+### Data Cleaning and Manipulation
+Load Packages
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(here)
+library(skimr)
+library(janitor)
+library(lubridate)
+
+
+```
+
+
+Read in the Data
+```{r message=FALSE, warning=FALSE}
+
+jan_21 <- read_csv(here("data", "202101-divvy-tripdata.csv"))
+feb_21 <- read_csv(here("data", "202102-divvy-tripdata.csv"))
+mar_21 <- read_csv(here("data", "202103-divvy-tripdata.csv"))
+april_21 <- read.csv(here("data", "202104-divvy-tripdata.csv"))
+may_21 <- read_csv(here("data", "202105-divvy-tripdata.csv"))
+june_21 <- read_csv(here("data", "202106-divvy-tripdata.csv"))
+july_21 <- read_csv(here("data", "202107-divvy-tripdata.csv"))
+aug_21 <- read_csv(here("data", "202108-divvy-tripdata.csv"))
+sept_21 <- read_csv(here("data", "202109-divvy-tripdata.csv"))
+oct_21 <- read_csv(here("data", "202110-divvy-tripdata.csv"))
+nov_21 <- read_csv(here("data", "202111-divvy-tripdata.csv"))
+dec_21 <- read_csv(here("data", "202112-divvy-tripdata.csv"))
+
+
+```
+
+
+Combine all of the data into one large dataframe for the year.
+```{r message=FALSE, warning=FALSE}
+full_year <- rbind(jan_21, feb_21, mar_21, april_21, may_21, june_21, july_21, aug_21, sept_21, oct_21, nov_21, dec_21)
+
+```
+
+
+Split the started_ at and ended_at date/time columns into separate date and time columns for future analysis.
+```{r message=FALSE, warning=FALSE}
+full_year$start_time <- format(as.POSIXct(full_year$started_at),format = "%H:%M:%S")
+full_year$start_date <- as.Date (full_year$started_at)
+
+full_year$end_time <- format(as.POSIXct(full_year$ended_at),format = "%H:%M:%S")
+full_year$end_date <- as.Date (full_year$ended_at)
+
+```
+
+
+Add a column for day of the week for additional analysis
+```{r message=FALSE, warning=FALSE}
+full_year$day <- strftime(full_year$start_date, "%A")
+
+```
+
+
+Calculate trip duration and select appropriate columns for analysis
+```{r message=FALSE, warning=FALSE}
+full_year <- full_year %>% 
+  mutate(trip_duration = difftime(ended_at, started_at, units = "min")) %>% 
+  select(rideable_type, member_casual,start_station_name, start_lat, start_lng, start_date, start_time, day, trip_duration)
+
+```
+
+Make data more readable
+```{r message=FALSE, warning=FALSE}
+full_year$rideable_type<-replace(full_year$rideable_type,full_year$rideable_type=="classic_bike","Classic")
+full_year$rideable_type<-replace(full_year$rideable_type,full_year$rideable_type=="docked_bike","Docked")
+full_year$rideable_type<-replace(full_year$rideable_type,full_year$rideable_type=="electric_bike","Electric")
+full_year$member_casual<-replace(full_year$member_casual,full_year$member_casual=="member","Member")
+full_year$member_casual<-replace(full_year$member_casual,full_year$member_casual=="casual","Casual")
+```
+
+
+Create a new CSV of cleaned data for analysis
+```{r}
+write_csv (full_year,here("data", "full_year.csv"))
+
+```
+
+I also read in and joined the weather data in the same manner. Columns were selected for further analysis and eventually combined with the count data from the analysis below using a spreadsheet. It was then exported as a CSV in order to plot the data in R. 
+
+## Summary of Analysis
+
+Basic count and summary statistics by rider type
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+full_year %>% 
+  group_by(member_casual) %>% 
+  count(member_casual)
+
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+full_year %>% 
+  group_by(member_casual) %>% 
+  summarise(median_duration = median(trip_duration, na.rm = TRUE),
+            max_duration = max(trip_duration, na.rm = TRUE), 
+            mean_duration = mean(trip_duration [trip_duration < 1440.0]))
+
+```
+
+From this initial analysis there a few trends become immediately apparent. First, the median and the max duration are far apart. Upon further investigation, it became apparent there are a handful users keeping the bikes for longer than 24 hours. This accounted for less than 1% of the total observations, so they were not included in the mean calculations. Second, it became clear that members take shorter rides but also utilize the bikes more frequently, resulting in increased ridership among that group. 
+
+
+Data regarding day of the week was analyzed. What can be seen from this graph is a steady ridership from members throught the week. This makes sense with a large portion of those riders being commuters, as noted in the original documentation. By constrast, casual riders did not ride as much during the week, but ridership spikes 
+
+![](Output/dayweek.png)
+
+Not only can we see preferences for day of the week, but also seasonality. Chicago is a midwest city with four seasons. Winter in Chicago can be very cold and conditions for cycling can be difficult, with ice and snow hampering street and cycling path access. While the city of Chicago is responsible to clear bike lanes and dedicated bike paths, often if can take some time before protected bike lanes and bike paths are cleared, (See articles [here](https://chi.streetsblog.org/2018/12/05/blizzard-of-dot-transpo-officials-provide-deets-on-bike-lane-plowing-protocols/) and [here](https://chi.streetsblog.org/2016/12/16/a-tale-of-two-trails-why-is-the-lakefront-plowed-but-not-the-bloomingdale/)). As a result  of these factors ridership is reduced. Evidence of this can be seen in the graph below, in both groups ridership is greatly reduced in the winter months However, in April, when things begin to warm up and conditions improve, the number of daily rides increases, with the highest ride counts in June through October. The main difference is variation within the groups. Daily rides for members stayed pretty consistent throughout the year and members seemed more willing to ride in the cooler weather of spring and fall (Real Feel 30-50°).   In contrast, casual riders were less inclined to ride in the cooler weather, especially in the fall. In the summer months when the weather is warm, ridership among casual riders spiked dramatically, as people seek to be outdoors more often. I chose to use the Average Feel data instead of Average Daily Temperature for this portion of the analysis, because a variety of factors can contribute to how warm or cold it feels outside, and often it can feel much colder than it is in reality. 
+
+
+![](Output/ridecount.png)
+
+Another interesting finding was in the average trip duration. Throughout the year, trip duration for members stayed very consistent, with a few outliers. Casual riders had much longer ride times and the times varied widely thoughout the year. In addition to this, the shape of the graph is different than the previous plot. This indicates conditions outdoors don't seem to contribute as much to the duration of rides.  This holds true for both groups, as can be seen below.
+
+
+![](Output/avgduration.png)
+
+
+The last thing examined was the popularity of stations. For both groups the top 20 stations with the most rides departing from them were plotted on a map using Tableau. Generally speaking, casual riders favored stations near popular parks and tourist destinations along the lake front. While there is some overlap with casual riders, many of the stations members left from were concentrated away from the waterfront in other parts of the city.  
+
+![](Output/Popular Station Locations 2021.png)
+
+
+## Key Findings
+
+- Casual members prefer to ride on the weekends, members consistently ride throughout the week.
+
+- Casual members see a spike in ridership with the temperature feels warmer outside. While ridership is certainly increased   when it is warm outside, members are more willing to ride when the weather is cooler.
+
+- Casual members take longer rides. Members take shorter but more frequent rides. 
+
+- Casual members prefer stations near popular parks and tourist destinations. Members favor stations more widely throughout   the city.
+
+
+
+## Recomendations
+
+
+**1.** Target advertising to the "weekend warrior." Highlight how someone may still get a tremendous benefit from an annual membership, even if they are riding exclusively on the weekend. 
+
+**2.** Show the  many exciting destinations within the city a person can visit by bike. The idea of staying in the city and exploring all it has to offer throughout the year, especially along the lake shore near museums and parks. In addition to this, the average cost of gas in Illinois (as of 5/27/22) is $4.96 per gallon according to [AAA](https://gasprices.aaa.com/?state=IL). This means that for the cost of about 2 tanks of gas, one can have an annual Cyclistic membership and can inexpensivly take weekend excursions throughout the year, representing an excellent value. 
+
+**3.** Explore a targeted advertising campaign in the spring and summer months when casual members are enjoying being outside riding bikes. Practically speaking, not many people want to ride when the real feel is below zero, and the data bears this out. So reaching riders when the weather is warming up and the summer is before them is going to be critical to increasing annual memberships.
+
+
+## Acknowledgements
+I would like to thank Caitlin Bremner for her help in a few sections of the code in R. I have made comments in the code where she contributed. 
+
+
+
+
+
+
+
+
+
+
+
