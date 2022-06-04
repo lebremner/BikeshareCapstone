@@ -129,7 +129,11 @@ full_year %>%
             max_duration = max(trip_duration, na.rm = TRUE), 
             mean_duration = mean(trip_duration [trip_duration < 1440.0]))
 
-   
+ #Day of week analysis (I made this work all by myself!!!)
+
+day_of_week <- full_year %>% 
+  group_by(member_casual, day) %>% 
+  summarise(count_day = n()) 
 
  #Mean trip duration by date, shows seasonality and splits out by membership types----
  full_year_date <- full_year %>% 
@@ -183,11 +187,7 @@ bike_type_member <- full_year %>%
   group_by(member_casual, rideable_type) %>% 
   count(rideable_type)
 
-#Day of week analysis (I made this work all by myself!!!)
 
-day_of_week <- full_year %>% 
-  group_by(member_casual, day) %>% 
-  summarise(count_day = n()) 
   
 
 write_csv(day_of_week, here("data", "day_of_week.csv"))
